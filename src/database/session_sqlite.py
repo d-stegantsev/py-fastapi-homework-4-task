@@ -9,6 +9,7 @@ from database import Base
 _sqlite_engine: Optional[AsyncEngine] = None
 _async_sqlite_session_local: Optional[sessionmaker] = None
 
+
 def get_sqlite_engine_and_session():
     global _sqlite_engine, _async_sqlite_session_local
     if _sqlite_engine is None or _async_sqlite_session_local is None:
@@ -23,16 +24,19 @@ def get_sqlite_engine_and_session():
         )
     return _sqlite_engine, _async_sqlite_session_local
 
+
 async def get_sqlite_db() -> AsyncGenerator[AsyncSession, None]:
     _, AsyncSQLiteSessionLocal = get_sqlite_engine_and_session()
     async with AsyncSQLiteSessionLocal() as session:
         yield session
+
 
 @asynccontextmanager
 async def get_sqlite_db_contextmanager() -> AsyncGenerator[AsyncSession, None]:
     _, AsyncSQLiteSessionLocal = get_sqlite_engine_and_session()
     async with AsyncSQLiteSessionLocal() as session:
         yield session
+
 
 async def reset_sqlite_database() -> None:
     sqlite_engine, _ = get_sqlite_engine_and_session()
