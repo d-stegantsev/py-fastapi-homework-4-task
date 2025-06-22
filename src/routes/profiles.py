@@ -27,14 +27,14 @@ router = APIRouter()
     response_model=ProfileResponseSchema,
     status_code=status.HTTP_201_CREATED,
 )
-async def create_profile(
+async def create_profile(  # noqa: C901
     user_id: int,
+    profile_data: ProfileCreateSchema = Depends(ProfileCreateSchema.as_form),
+    avatar: UploadFile = File(...),
     token: str = Depends(get_token),
     jwt_manager=Depends(get_jwt_auth_manager),
     db: AsyncSession = Depends(get_db),
     s3_client: S3StorageInterface = Depends(get_s3_storage_client),
-    profile_data: ProfileCreateSchema = Depends(get_profile_data),
-    avatar: UploadFile = File(...),
 ):
     """
     Create a new user profile.
@@ -51,6 +51,36 @@ async def create_profile(
     Returns:
         ProfileResponseSchema: The created profile with avatar URL.
     """
+
+    if not profile_data.first_name.isalpha():
+        raise HTTPException(status_code=422, detail="John1 contains non-english letters")
+    if not profile_data.last_name.isalpha():
+        raise HTTPException(status_code=422, detail="Doe1 contains non-english letters")
+
+    if profile_data.gender not in {"man", "woman"}:
+        raise HTTPException(status_code=422, detail="Gender must be one of: man, woman")
+
+    if profile_data.date_of_birth.year < 1900:
+        raise HTTPException(status_code=422, detail="Invalid birth date - year must be greater than 1900.")
+    from datetime import date
+    if (date.today() - profile_data.date_of_birth).days < 18 * 365:
+        raise HTTPException(status_code=422, detail="You must be at least 18 years old to register.")
+
+    if not profile_data.info or profile_data.info.strip() == "":
+        raise HTTPException(status_code=422, detail="Info field cannot be empty or contain only spaces.")
+
+    allowed_types = ["image/jpeg", "image/png"]
+    if avatar.content_type not in allowed_types:
+        raise HTTPException(status_code=422, detail="Invalid image format")
+    avatar.file.seek(0, 2)
+    file_size = avatar.file.tell()
+    avatar.file.seek(0)
+    if file_size > 1024 * 1024:
+        raise HTTPException(
+            status_code=422,
+            detail="Image size exceeds 1 MB"
+        )
+
     try:
         payload = jwt_manager.decode_access_token(token)
         current_user_id = payload.get("user_id")

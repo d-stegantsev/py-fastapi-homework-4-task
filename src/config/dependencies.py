@@ -1,7 +1,8 @@
 import os
 from datetime import date
 
-from fastapi import Depends, Form
+from fastapi import Depends, Form, HTTPException
+from pydantic import ValidationError
 
 from config.settings import TestingSettings, Settings, BaseAppSettings
 from notifications import EmailSenderInterface, EmailSender
@@ -114,10 +115,16 @@ async def get_profile_data(
     date_of_birth: date = Form(...),
     info: str = Form(...),
 ) -> ProfileCreateSchema:
-    return ProfileCreateSchema(
-        first_name=first_name,
-        last_name=last_name,
-        gender=gender,
-        date_of_birth=date_of_birth,
-        info=info,
-    )
+    try:
+        return ProfileCreateSchema(
+            first_name=first_name,
+            last_name=last_name,
+            gender=gender,
+            date_of_birth=date_of_birth,
+            info=info,
+        )
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=422,
+            detail=e.errors()
+        )
